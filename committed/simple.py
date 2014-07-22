@@ -55,6 +55,20 @@ def project_owners(limit=None):
     return owners
 
 
+def project_contributors(p):
+    """Given a project, list its contributors."""
+    print("{0}".format(p['name']))
+    print("-" * len(p['name']))
+
+    # List the owner(s) first:
+    for rel in p.match_outgoing(rel_type="OWNED_BY"):
+        print("> Owner: {0}".format(rel.end_node['name']))
+
+    # Then list all contributor(s)
+    for rel in p.match_incoming(rel_type="CONTRIBUTES_TO"):
+        print("* {0}".format(rel.start_node['name']))
+
+
 def list_user_contributors(n):
     """Given a User Node, list the projects they own, and all the people that
     contribute to each project."""
@@ -70,15 +84,11 @@ def list_user_contributors(n):
 
         for rel in project.match_incoming(rel_type="CONTRIBUTES_TO"):
             user = rel.start_node
-            #print("({0})-[CONTRIBUTES_TO]->({1})".format(
-                #rel.start_node['name'],
-                #rel.end_node['name']
-            #))
             if user['username'] != n['username']:
                 print("* {0}".format(user['name']))
 
 
-# Additional Questions
-# --------------------
+# Additional, Interesting Questions
 # - who contributes to the same projects that I've contributed to
 # - how many "hops" am I away from someone?
+# ^^ Require CYPHER queries.
