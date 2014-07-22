@@ -1,8 +1,13 @@
 import random
 from py2neo import neo4j, node, rel
 
+
+HOST = 'http://localhost:7474'
+PATH = '/db/data/'
+
 # Connect to a DB.
-db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
+db = neo4j.GraphDatabaseService(HOST + PATH)
+
 
 # -----------------------------------------------------------------------------
 # I'm gonna generate some sample data while learning this stuff. The following
