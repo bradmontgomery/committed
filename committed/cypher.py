@@ -9,7 +9,7 @@ from db import HOST
 from simple import _first
 
 
-def cyper_transaction():
+def cypher_transaction():
     """Creates & Returns a Cyper Transaction."""
     session = cypher.Session(HOST)
     return session.create_transaction()
@@ -17,7 +17,7 @@ def cyper_transaction():
 
 def get_user(username):
     """Get a User Node based on a username."""
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     query = """MATCH (n:user) WHERE n.username={username} RETURN n"""
     tx.append(query, parameters={'username': username})
     result = tx.commit()
@@ -34,7 +34,7 @@ def get_user(username):
 def get_user_projects(username):
     """List a user's projects."""
 
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     query = """
         MATCH (p:project)-[:OWNED_BY]->(u:user {username:{uname}})
         RETURN p
@@ -51,7 +51,7 @@ def get_user_projects(username):
 
 def get_project(name):
     """Get a Project Node based on it's name"""
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     query = """MATCH (n:project) WHERE n.name={project_name} RETURN n"""
     tx.append(query, parameters={'project_name': name})
     result = tx.commit()
@@ -67,7 +67,7 @@ def get_project(name):
 
 def project_owners(limit=None):
     """Print and return User Nodes that own projects (with an optional limit)"""
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     query = """MATCH (p:project)-[:OWNED_BY]->(u:user) RETURN u, p"""
     if limit is not None:
         query += " LIMIT {limit}"
@@ -86,7 +86,7 @@ def project_owners(limit=None):
 
 def project_contributors(project_name):
     """Given a project, list its contributors."""
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     owners_query = """
         MATCH (p:project)-[:OWNED_BY]->(u:user)
         WHERE p.name={project_name}
@@ -113,7 +113,7 @@ def list_user_contributors(n):
     """Given a User Node, list the projects they own, and all the people that
     contribute to each project."""
 
-    tx = cyper_transaction()
+    tx = cypher_transaction()
     query = """
         MATCH (p:project)-[:OWNED_BY]->(owner),
               (u:user)-[:CONTRIBUTES_TO]->(p)
@@ -135,7 +135,7 @@ def user_path(a, b):
     many `hops` are in between? What's the shortest path?
 
     """
-    tx = cyper_transaction()
+    tx = cypher_transaction()
 
     # Limit the number of relationships in the path?
     # p = shortestPath((a)-[*..15]-(b))
@@ -155,7 +155,7 @@ def user_path(a, b):
     paths = []
     for record in results:
         length, path = record.values
-        m = "There are {0} hops from {1} to {2}"
+        m = "There are {0} hops from {1} to {2}:\n"
         print(m.format(length, a['name'], b['name']))
         for rel in path.relationships:
             print("  ({0})-[:{1}]->({2})".format(
@@ -165,3 +165,59 @@ def user_path(a, b):
             ))
         paths.append(path)
     return paths
+
+
+def project_recommendations(project_name, limit=5):
+    """
+    People that contribute to `project_name` also contribute to...
+    """
+    query = """
+    MATCH
+      (p:project)<-[:CONTRIBUTES_TO]-(u:user)-[:CONTRIBUTES_TO]->(o:project)
+    WHERE p.name={name}
+    RETURN o.name, count(*)
+    ORDER BY count(*) DESC, o.name
+    LIMIT {limit}
+    """
+    # o.name            count(*)
+    # --------------------------
+    # open-jackrabbit       6
+    # flailing-jackrabbit   5
+    # secret-butterfly      5
+    # tiny-armyant          5
+    # flaming-butterfly     3
+
+    tx = cypher_transaction()
+    tx.append(query, parameters={"name": project_name, "limit": limit})
+    results = _first(tx.commit())
+    for record in results:
+        name, count = record.values
+        print("({0}) {1}".format(count, name))
+    return results
+
+
+def similar_contributors(username, limit=10):
+    """Find People who contribute to "similar" projects as `username`."""
+    query = """
+    MATCH
+      (me:user)-[:CONTRIBUTES_TO]->(p:project)-[:OWNED_BY]->
+      (u)-[:CONTRIBUTES_TO]->(x:project)<-[:CONTRIBUTES_TO]-(people)
+    WHERE me.username={username} AND NOT me=people
+    RETURN people.name AS name, count(*) AS similar_contribs
+    ORDER BY similar_contribs DESC
+    """
+    # people.name         count(*)
+    # ---------------------------
+    # 'Bridget Betty'       33
+    # 'Donald Catherine'    33
+    # 'Donald Bob'          30
+    # 'Frank Chuck'         28
+    # 'Bob Brad'            27
+
+    tx = cypher_transaction()
+    tx.append(query, parameters={"username": username, "limit": limit})
+    results = _first(tx.commit())
+    for record in results:
+        name, count = record.values
+        print("{0}".format(name))
+    return results
